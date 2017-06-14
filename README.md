@@ -4,7 +4,7 @@ Cloudinary's variant of DSSIM, based on Philipp Klaus Krause's adaptation of Rab
 using ideas from Kornel Lesinski's DSSIM implementation as well as several new ideas.
 
 This is a perceptual metric designed specifically for scoring image compression related artifacts
-in a way that correlates well with human opinions. For more information, see http://cloudinary.com/blog/ssimulacra/
+in a way that correlates well with human opinions. For more information, see http://cloudinary.com/blog/detecting_the_psychovisual_impact_of_compression_related_artifacts_using_ssimulacra
 
 
 
