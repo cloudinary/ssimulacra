@@ -25,6 +25,7 @@ Known limitations:
 ## Build instructions
 
 * Install OpenCV
+* Install Boost
 * Do `make`
 
 
