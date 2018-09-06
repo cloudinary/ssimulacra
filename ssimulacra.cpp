@@ -82,11 +82,12 @@
 #include <highgui.h>
 #include <stdio.h>
 #include <set>
+#include "boost/filesystem.hpp" 
 
-// comment this in to produce debug images that show the differences at each scale
-//#define DEBUG_IMAGES 1
+
 using namespace std;
 using namespace cv;
+using namespace boost::filesystem;
 
 // All of the constants below are more or less arbitrary.
 // Some amount of tweaking/calibration was done, but there is certainly room for improvement.
@@ -158,9 +159,11 @@ inline void rgb2lab(Vec3f &p) {
 
 
 int main(int argc, char** argv) {
+	
 
-    if(argc!=3) {
-        fprintf(stderr, "Usage: %s orig_image distorted_image\n", argv[0]);
+    if (argc != 3 && argc != 4) {
+        fprintf(stderr, "Usage: %s orig_image distorted_image debug\n", argv[0]);
+		fprintf(stderr, "If 'debug' is present , then generate debug images\n");
         fprintf(stderr, "Returns a value between 0 (images are identical) and 1 (images are very different)\n");
         fprintf(stderr, "If the value is above 0.1 (or so), the distortion is likely to be perceptible / annoying.\n");
         fprintf(stderr, "If the value is below 0.01 (or so), the distortion is likely to be imperceptible.\n");
@@ -190,6 +193,14 @@ int main(int argc, char** argv) {
         fprintf(stderr,  "Image is too small; need at least 8 rows and columns.\n");
         return -1;
     }
+	
+	string file_name;
+	if (argc == 4 && argv[3] == string("debug")) {
+		path p{argv[1]};
+		file_name = p.stem().string(); //filename without extension
+		#define DEBUG_IMAGES 1
+	}
+	
     int pixels = img1_temp.rows * img1_temp.cols;
     if (nChan == 4) {
         // blend to a gray background to have a fair comparison of semi-transparent RGB values
@@ -284,7 +295,7 @@ int main(int argc, char** argv) {
             Vec3b &p = ssim_image.at<Vec3b>(i);
             p = {(uchar)(255-p[2]),(uchar)(255-p[0]),(uchar)(255-p[1])};
         }
-      imwrite("debug-scale"+to_string(scale)+".png",ssim_image);
+      imwrite(file_name+"_"+"debug-scale"+to_string(scale)+".png",ssim_image);
 #endif
 
 
@@ -313,7 +324,7 @@ int main(int argc, char** argv) {
             Vec3b &p = edgediff_image.at<Vec3b>(i);
             p = {(uchar)(p[1]+p[2]),p[0],p[0]};
         }
-        imwrite("debug-edgediff.png",edgediff_image);
+        imwrite(file_name+"_"+"debug-edgediff.png",edgediff_image);
 #endif
 
         edgediff = Scalar(1.0,1.0,1.0,1.0) - edgediff;
@@ -379,4 +390,3 @@ int main(int argc, char** argv) {
 
     return(0);
 }
-
