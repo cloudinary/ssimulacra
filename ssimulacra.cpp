@@ -130,7 +130,9 @@ const double min_weight[4] = {0.1,0.005,0.005,0.005};
 const double extra_edges_weight[4] = {1.5, 0.1, 0.1, 0.5};
 
 // higher value means more importance to grid-like artifacts (blockiness)
-const double worst_grid_weight[4] = {1.0, 0.1, 0.1, 0.5};
+const double worst_grid_weight[2][4] = 
+    { {1.0, 0.1, 0.1, 0.5},             // on ssim heatmap
+      {1.0, 0.1, 0.1, 0.5} };           // on extra_edges heatmap
 
 
 // Convert linear RGB to L*a*b* (all in 0..1 range)
@@ -206,6 +208,7 @@ int main(int argc, char** argv) {
     }
 
 
+    if (nChan > 1) {
     // Create lookup table to convert 8-bit sRGB to linear RGB
     Mat sRGB_gamma_LUT(1, 256, CV_32FC1);
     for (int i = 0; i < 256; i++) {
@@ -216,6 +219,10 @@ int main(int argc, char** argv) {
     // Convert from sRGB to linear RGB
     LUT(img1_temp, sRGB_gamma_LUT, img1);
     LUT(img2_temp, sRGB_gamma_LUT, img2);
+    } else {
+        img1 = Mat(img1_temp.rows, img1_temp.cols, CV_32FC1);
+        img2 = Mat(img1_temp.rows, img1_temp.cols, CV_32FC1);
+    }
 
     // Convert from linear RGB to Lab in a 0..1 range
     if (nChan == 3) {
@@ -225,8 +232,8 @@ int main(int argc, char** argv) {
       for( int i=0 ; i < pixels; i++ ) { Vec3f p = {img1.at<Vec4f>(i)[0],img1.at<Vec4f>(i)[1],img1.at<Vec4f>(i)[2]}; rgb2lab(p); img1.at<Vec4f>(i)[0] = p[0]; img1.at<Vec4f>(i)[1] = p[1]; img1.at<Vec4f>(i)[2] = p[2];}
       for( int i=0 ; i < pixels; i++ ) { Vec3f p = {img2.at<Vec4f>(i)[0],img2.at<Vec4f>(i)[1],img2.at<Vec4f>(i)[2]}; rgb2lab(p); img2.at<Vec4f>(i)[0] = p[0]; img2.at<Vec4f>(i)[1] = p[1]; img2.at<Vec4f>(i)[2] = p[2];}
     } else if (nChan == 1) {
-      for( int i=0 ; i < pixels; i++ ) { Vec3f p = {img1.at<float>(i),img1.at<float>(i),img1.at<float>(i)}; rgb2lab(p); img1.at<float>(i) = p[0];}
-      for( int i=0 ; i < pixels; i++ ) { Vec3f p = {img2.at<float>(i),img2.at<float>(i),img2.at<float>(i)}; rgb2lab(p); img2.at<float>(i) = p[0];}
+      for( int i=0 ; i < pixels; i++ ) { img1.at<float>(i) = img1_temp.at<uchar>(i)/255.0;}
+      for( int i=0 ; i < pixels; i++ ) { img2.at<float>(i) = img2_temp.at<uchar>(i)/255.0;}
     } else {
         fprintf(stderr, "Can only deal with Grayscale, RGB or RGBA input.\n");
         return(-1);
@@ -289,17 +296,7 @@ int main(int argc, char** argv) {
       }
 
 
-      // worst ssim in a particular 4x4 block (larger blocks are considered too because of multi-scale)
-      resize(ssim_map, ssim_map, Size(), 0.25, 0.25, INTER_AREA);
-
-      Mat ssim_map_c[4];
-      split(ssim_map, ssim_map_c);
-      for (unsigned int i=0; i < nChan; i++) {
-        double minVal;
-        minMaxLoc(ssim_map_c[i], &minVal);
-        dssim += min_weight[i]  * minVal * mscale_weights[i][scale];
-        dssim_max += min_weight[i]  * mscale_weights[i][scale];
-      }
+//      resize(ssim_map, ssim_map, Size(), 0.5, 0.5, INTER_AREA);
 
 
       // the edge/blockiness penalty is only done for the fullsize images
@@ -341,8 +338,8 @@ int main(int argc, char** argv) {
             for (unsigned int i = 0; i < nChan; i++) row_scores[i].insert(ravg[i]);
           }
           for(unsigned int i = 0; i < nChan; i++) {
-            int k=0; for (const double& s : row_scores[i]) { if (k++ >= ssim_map.rows/50) { dssim += worst_grid_weight[i] * s; break; } }
-            dssim_max += worst_grid_weight[i];
+            int k=0; for (const double& s : row_scores[i]) { if (k++ >= ssim_map.rows/50) { dssim += worst_grid_weight[twice][i] * s; break; } }
+            dssim_max += worst_grid_weight[twice][i];
           }
           // Find the 2nd percentile worst column. Same concept as above.
           multiset<double> col_scores[4];
@@ -352,11 +349,25 @@ int main(int argc, char** argv) {
             for (unsigned int i = 0; i < nChan; i++) col_scores[i].insert(cavg[i]);
           }
           for(unsigned int i = 0; i < nChan; i++) {
-            int k=0; for (const double& s : col_scores[i]) { if (k++ >= ssim_map.cols/50) { dssim += worst_grid_weight[i] * s; break; } }
-            dssim_max += worst_grid_weight[i];
+            int k=0; for (const double& s : col_scores[i]) { if (k++ >= ssim_map.cols/50) { dssim += worst_grid_weight[twice][i] * s; break; } }
+            dssim_max += worst_grid_weight[twice][i];
           }
         }
       }
+
+      // worst ssim in a particular 4x4 block (larger blocks are considered too because of multi-scale)
+      resize(ssim_map, ssim_map, Size(), 0.25, 0.25, INTER_AREA);
+//      resize(ssim_map, ssim_map, Size(), 0.5, 0.5, INTER_AREA);
+
+      Mat ssim_map_c[4];
+      split(ssim_map, ssim_map_c);
+      for (unsigned int i=0; i < nChan; i++) {
+        double minVal;
+        minMaxLoc(ssim_map_c[i], &minVal);
+        dssim += min_weight[i]  * minVal * mscale_weights[i][scale];
+        dssim_max += min_weight[i]  * mscale_weights[i][scale];
+      }
+
     }
 
 
