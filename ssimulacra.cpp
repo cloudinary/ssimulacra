@@ -326,30 +326,32 @@ int main(int argc, char** argv) {
 
         // grid-like artifact detection
         // do the things below twice: once for the SSIM map, once for the artifact-edge map
+        Mat errormap;
         for(int twice=0; twice < 2; twice++) {
-          if (twice) { ssim_map = edgediff; }
+          if (twice == 0) errormap = ssim_map;
+          else errormap = edgediff;
 
           // Find the 2nd percentile worst row. If the compression uses blocks, there will be artifacts around the block edges,
           // so even with 32x32 blocks, the 2nd percentile will likely be one of the rows with block borders
           multiset<double> row_scores[4];
-          for (int y = 0; y < ssim_map.rows; y++) {
-            Mat roi = ssim_map(Rect(0,y,ssim_map.cols,1));
+          for (int y = 0; y < errormap.rows; y++) {
+            Mat roi = errormap(Rect(0,y,errormap.cols,1));
             Scalar ravg = mean(roi);
             for (unsigned int i = 0; i < nChan; i++) row_scores[i].insert(ravg[i]);
           }
           for(unsigned int i = 0; i < nChan; i++) {
-            int k=0; for (const double& s : row_scores[i]) { if (k++ >= ssim_map.rows/50) { dssim += worst_grid_weight[twice][i] * s; break; } }
+            int k=0; for (const double& s : row_scores[i]) { if (k++ >= errormap.rows/50) { dssim += worst_grid_weight[twice][i] * s; break; } }
             dssim_max += worst_grid_weight[twice][i];
           }
           // Find the 2nd percentile worst column. Same concept as above.
           multiset<double> col_scores[4];
-          for (int x = 0; x < ssim_map.cols; x++) {
-            Mat roi = ssim_map(Rect(x,0,1,ssim_map.rows));
+          for (int x = 0; x < errormap.cols; x++) {
+            Mat roi = errormap(Rect(x,0,1,errormap.rows));
             Scalar cavg = mean(roi);
             for (unsigned int i = 0; i < nChan; i++) col_scores[i].insert(cavg[i]);
           }
           for(unsigned int i = 0; i < nChan; i++) {
-            int k=0; for (const double& s : col_scores[i]) { if (k++ >= ssim_map.cols/50) { dssim += worst_grid_weight[twice][i] * s; break; } }
+            int k=0; for (const double& s : col_scores[i]) { if (k++ >= errormap.cols/50) { dssim += worst_grid_weight[twice][i] * s; break; } }
             dssim_max += worst_grid_weight[twice][i];
           }
         }
