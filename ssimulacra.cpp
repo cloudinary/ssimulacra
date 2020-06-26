@@ -78,8 +78,7 @@
     OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-#include <cv.hpp>
-#include <highgui.h>
+#include <opencv2/opencv.hpp>
 #include <stdio.h>
 #include <set>
 
