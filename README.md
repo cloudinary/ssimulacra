@@ -1,3 +1,8 @@
+## Update
+
+This is the original SSIMULACRA metric from 2016-2017.
+It will no longer be updated; however, there is a new SSIMULACRA 2 metric available at https://github.com/cloudinary/ssimulacra2 which correlates better with human opinions.
+
 # SSIMULACRA - Structural SIMilarity Unveiling Local And Compression Related Artifacts
 
 Cloudinary's variant of DSSIM, based on Philipp Klaus Krause's adaptation of Rabah Mehdi's SSIM implementation,
