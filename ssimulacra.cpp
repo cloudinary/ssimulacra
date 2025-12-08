@@ -156,32 +156,32 @@ inline void rgb2lab(Vec3f &p) {
 }
 
 void grid_artifacts(Mat &errormap, int nChan, double &score, double &score_max, int twice) {
-        // grid-like artifact detection
-        // do the things below twice: once for the SSIM map, once for the artifact-edge map
+    // grid-like artifact detection
+    // do the things below twice: once for the SSIM map, once for the artifact-edge map
 
-          // Find the 2nd percentile worst row. If the compression uses blocks, there will be artifacts around the block edges,
-          // so even with 32x32 blocks, the 2nd percentile will likely be one of the rows with block borders
-          multiset<double> row_scores[4];
-          for (int y = 0; y < errormap.rows; y++) {
-            Mat roi = errormap(Rect(0,y,errormap.cols,1));
-            Scalar ravg = mean(roi);
-            for (unsigned int i = 0; i < nChan; i++) row_scores[i].insert(ravg[i]);
-          }
-          for(unsigned int i = 0; i < nChan; i++) {
-            int k=0; for (const double& s : row_scores[i]) { if (k++ >= errormap.rows/50) { score += worst_grid_weight[twice][i] * s; break; } }
-            score_max += worst_grid_weight[twice][i];
-          }
-          // Find the 2nd percentile worst column. Same concept as above.
-          multiset<double> col_scores[4];
-          for (int x = 0; x < errormap.cols; x++) {
-            Mat roi = errormap(Rect(x,0,1,errormap.rows));
-            Scalar cavg = mean(roi);
-            for (unsigned int i = 0; i < nChan; i++) col_scores[i].insert(cavg[i]);
-          }
-          for(unsigned int i = 0; i < nChan; i++) {
-            int k=0; for (const double& s : col_scores[i]) { if (k++ >= errormap.cols/50) { score += worst_grid_weight[twice][i] * s; break; } }
-            score_max += worst_grid_weight[twice][i];
-          }
+    // Find the 2nd percentile worst row. If the compression uses blocks, there will be artifacts around the block edges,
+    // so even with 32x32 blocks, the 2nd percentile will likely be one of the rows with block borders
+    multiset<double> row_scores[4];
+    for (int y = 0; y < errormap.rows; y++) {
+        Mat roi = errormap(Rect(0,y,errormap.cols,1));
+        Scalar ravg = mean(roi);
+        for (unsigned int i = 0; i < nChan; i++) row_scores[i].insert(ravg[i]);
+    }
+    for(unsigned int i = 0; i < nChan; i++) {
+        int k=0; for (const double& s : row_scores[i]) { if (k++ >= errormap.rows/50) { score += worst_grid_weight[twice][i] * s; break; } }
+        score_max += worst_grid_weight[twice][i];
+    }
+    // Find the 2nd percentile worst column. Same concept as above.
+    multiset<double> col_scores[4];
+    for (int x = 0; x < errormap.cols; x++) {
+        Mat roi = errormap(Rect(x,0,1,errormap.rows));
+        Scalar cavg = mean(roi);
+        for (unsigned int i = 0; i < nChan; i++) col_scores[i].insert(cavg[i]);
+    }
+    for(unsigned int i = 0; i < nChan; i++) {
+        int k=0; for (const double& s : col_scores[i]) { if (k++ >= errormap.cols/50) { score += worst_grid_weight[twice][i] * s; break; } }
+        score_max += worst_grid_weight[twice][i];
+    }
 }
 
 int main(int argc, char** argv) {
@@ -237,34 +237,37 @@ int main(int argc, char** argv) {
 
 
     if (nChan > 1) {
-    // Create lookup table to convert 8-bit sRGB to linear RGB
-    Mat sRGB_gamma_LUT(1, 256, CV_32FC1);
-    for (int i = 0; i < 256; i++) {
-        float c = i / 255.0;
-        sRGB_gamma_LUT.at<float>(i) = (c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4));
-    }
+        // Create lookup table to convert 8-bit sRGB to linear RGB
+        Mat sRGB_gamma_LUT(1, 256, CV_32FC1);
+        for (int i = 0; i < 256; i++) {
+            float c = i / 255.0;
+            sRGB_gamma_LUT.at<float>(i) = (c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4));
+        }
 
-    // Convert from sRGB to linear RGB
-    LUT(img1_temp, sRGB_gamma_LUT, img1);
-    LUT(img2_temp, sRGB_gamma_LUT, img2);
+        // Convert from sRGB to linear RGB
+        LUT(img1_temp, sRGB_gamma_LUT, img1);
+        LUT(img2_temp, sRGB_gamma_LUT, img2);
     } else {
         img1 = Mat(img1_temp.rows, img1_temp.cols, CV_32FC1);
-        img2 = Mat(img1_temp.rows, img1_temp.cols, CV_32FC1);
+        img2 = Mat(img2_temp.rows, img2_temp.cols, CV_32FC1);
     }
-    img1_temp.release();
-    img2_temp.release();
 
     // Convert from linear RGB to Lab in a 0..1 range
     if (nChan == 3) {
-      for( int i=0 ; i < pixels; i++ ) rgb2lab(img1.at<Vec3f>(i));
-      for( int i=0 ; i < pixels; i++ ) rgb2lab(img2.at<Vec3f>(i));
+        for( int i=0 ; i < pixels; i++ ) rgb2lab(img1.at<Vec3f>(i));
+        for( int i=0 ; i < pixels; i++ ) rgb2lab(img2.at<Vec3f>(i));
     } else if (nChan == 4) {
-      for( int i=0 ; i < pixels; i++ ) { Vec3f p = {img1.at<Vec4f>(i)[0],img1.at<Vec4f>(i)[1],img1.at<Vec4f>(i)[2]}; rgb2lab(p); img1.at<Vec4f>(i)[0] = p[0]; img1.at<Vec4f>(i)[1] = p[1]; img1.at<Vec4f>(i)[2] = p[2];}
-      for( int i=0 ; i < pixels; i++ ) { Vec3f p = {img2.at<Vec4f>(i)[0],img2.at<Vec4f>(i)[1],img2.at<Vec4f>(i)[2]}; rgb2lab(p); img2.at<Vec4f>(i)[0] = p[0]; img2.at<Vec4f>(i)[1] = p[1]; img2.at<Vec4f>(i)[2] = p[2];}
+        for( int i=0 ; i < pixels; i++ ) { Vec3f p = {img1.at<Vec4f>(i)[0],img1.at<Vec4f>(i)[1],img1.at<Vec4f>(i)[2]}; rgb2lab(p); img1.at<Vec4f>(i)[0] = p[0]; img1.at<Vec4f>(i)[1] = p[1]; img1.at<Vec4f>(i)[2] = p[2];}
+        for( int i=0 ; i < pixels; i++ ) { Vec3f p = {img2.at<Vec4f>(i)[0],img2.at<Vec4f>(i)[1],img2.at<Vec4f>(i)[2]}; rgb2lab(p); img2.at<Vec4f>(i)[0] = p[0]; img2.at<Vec4f>(i)[1] = p[1]; img2.at<Vec4f>(i)[2] = p[2];}
     } else if (nChan == 1) {
-      for( int i=0 ; i < pixels; i++ ) { img1.at<float>(i) = img1_temp.at<uchar>(i)/255.0;}
-      for( int i=0 ; i < pixels; i++ ) { img2.at<float>(i) = img2_temp.at<uchar>(i)/255.0;}
-    } else {
+        for( int i=0 ; i < pixels; i++ ) { img1.at<float>(i) = img1_temp.at<uchar>(i)/255.0;}
+        for( int i=0 ; i < pixels; i++ ) { img2.at<float>(i) = img2_temp.at<uchar>(i)/255.0;}
+    }
+
+    img1_temp.release();
+    img2_temp.release();
+    
+    if (nChan != 1 && nChan != 3 && nChan != 4) {
         fprintf(stderr, "Can only deal with Grayscale, RGB or RGBA input.\n");
         return(-1);
     }
@@ -273,111 +276,108 @@ int main(int argc, char** argv) {
     double score=0, score_max=0;
 
     for (int scale = 0; scale < 6; scale++) {
-      Mat img1_img2, img1_sq, img2_sq, mu1, mu2, mu1_mu2, sigma1_sq, sigma2_sq, sigma12;
+        Mat img1_img2, img1_sq, img2_sq, mu1, mu2, mu1_mu2, sigma1_sq, sigma2_sq, sigma12;
 
-      if (img1.cols < 8 || img1.rows < 8) break;
+        if (img1.cols < 8 || img1.rows < 8) break;
 
-      // Standard SSIM computation
+        // Standard SSIM computation
 
+        GaussianBlur(img1, mu1, Size(11,11), 1.5);
+        GaussianBlur(img2, mu2, Size(11,11), 1.5);
 
-      GaussianBlur(img1, mu1, Size(11,11), 1.5);
-      GaussianBlur(img2, mu2, Size(11,11), 1.5);
+        multiply( img1, img2, img1_img2, 1 );
+        GaussianBlur(img1_img2, sigma12, Size(11,11), 1.5);
+        img1_img2.release();
+        multiply( mu1, mu2, mu1_mu2, 2 );
+        addWeighted( sigma12, 2, mu1_mu2, -1, C2, sigma12 );
+        mu1_mu2 += sC1;
+        multiply( mu1_mu2, sigma12, mu1_mu2);
+        sigma12.release();
 
-      multiply( img1, img2, img1_img2, 1 );
-      GaussianBlur(img1_img2, sigma12, Size(11,11), 1.5);
-      img1_img2.release();
-      multiply( mu1, mu2, mu1_mu2, 2 );
-      addWeighted( sigma12, 2, mu1_mu2, -1, C2, sigma12 );
-      mu1_mu2 += sC1;
-      multiply( mu1_mu2, sigma12, mu1_mu2);
-      sigma12.release();
+        // asymmetric: penalty for introducing edges where there are none (e.g. blockiness), no penalty for smoothing away edges
+        if (scale == 0) {
+            Mat edgediff = max(abs(img2 - mu2) - abs(img1 - mu1), 0);   // positive if img2 has an edge where img1 is smooth
 
-      // asymmetric: penalty for introducing edges where there are none (e.g. blockiness), no penalty for smoothing away edges
-      if (scale == 0) {
-        Mat edgediff = max(abs(img2 - mu2) - abs(img1 - mu1), 0);   // positive if img2 has an edge where img1 is smooth
-
-        // optional: write a nice debug image that shows the artifact edges
+            // optional: write a nice debug image that shows the artifact edges
 #ifdef DEBUG_IMAGES
-        Mat edgediff_image;
-        edgediff.convertTo(edgediff_image,CV_8UC3,5000); // multiplying by more than 255 to make things easier to see
-        for( int i=0 ; i < pixels; i++ ) {
-            Vec3b &p = edgediff_image.at<Vec3b>(i);
-            p = {(uchar)(p[1]+p[2]),p[0],p[0]};
-        }
-        imwrite("debug-edgediff.png",edgediff_image);
+            Mat edgediff_image;
+            edgediff.convertTo(edgediff_image,CV_8UC3,5000); // multiplying by more than 255 to make things easier to see
+            for( int i=0 ; i < pixels; i++ ) {
+                Vec3b &p = edgediff_image.at<Vec3b>(i);
+                p = {(uchar)(p[1]+p[2]),p[0],p[0]};
+            }
+            imwrite("debug-edgediff.png",edgediff_image);
 #endif
 
-        edgediff = Scalar(1.0,1.0,1.0,1.0) - edgediff;
+            edgediff = Scalar(1.0,1.0,1.0,1.0) - edgediff;
 
-        Scalar avg = mean(edgediff);
-        for(unsigned int i = 0; i < nChan; i++) {
-          score +=  extra_edges_weight[i] * avg[i];
-          score_max +=  extra_edges_weight[i];
+            Scalar avg = mean(edgediff);
+            for(unsigned int i = 0; i < nChan; i++) {
+                score +=  extra_edges_weight[i] * avg[i];
+                score_max +=  extra_edges_weight[i];
+            }
+            grid_artifacts(edgediff, nChan, score, score_max, 1);
         }
-        grid_artifacts(edgediff, nChan, score, score_max, 1);
-      }
 
-      cv::pow( img1, 2, img1_sq );
-      cv::pow( img2, 2, img2_sq );
+        cv::pow( img1, 2, img1_sq );
+        cv::pow( img2, 2, img2_sq );
 
-      // scale down 50% in each iteration (don't need full-res img1/img2 anymore here)
-      resize(img1, img1, Size(), 0.5, 0.5, INTER_AREA);
-      resize(img2, img2, Size(), 0.5, 0.5, INTER_AREA);
+        // scale down 50% in each iteration (don't need full-res img1/img2 anymore here)
+        resize(img1, img1, Size(), 0.5, 0.5, INTER_AREA);
+        resize(img2, img2, Size(), 0.5, 0.5, INTER_AREA);
 
-      cv::pow( mu1, 2, mu1 );
-      cv::pow( mu2, 2, mu2 );
-      mu1 += mu2;
-      mu2.release();
+        cv::pow( mu1, 2, mu1 );
+        cv::pow( mu2, 2, mu2 );
+        mu1 += mu2;
+        mu2.release();
 
-      GaussianBlur(img1_sq, sigma1_sq, Size(11,11), 1.5);
-      img1_sq.release();
+        GaussianBlur(img1_sq, sigma1_sq, Size(11,11), 1.5);
+        img1_sq.release();
 
-      GaussianBlur(img2_sq, sigma2_sq, Size(11,11), 1.5);
-      img2_sq.release();
-      addWeighted( sigma1_sq, 1, sigma2_sq, 1, 0, sigma1_sq );
-      sigma2_sq.release();
-      addWeighted( sigma1_sq, 1, mu1, -1, C2, sigma1_sq );
-      mu1 += sC1;
-      multiply( mu1, sigma1_sq, mu1 );
-      sigma1_sq.release();
+        GaussianBlur(img2_sq, sigma2_sq, Size(11,11), 1.5);
+        img2_sq.release();
+        addWeighted( sigma1_sq, 1, sigma2_sq, 1, 0, sigma1_sq );
+        sigma2_sq.release();
+        addWeighted( sigma1_sq, 1, mu1, -1, C2, sigma1_sq );
+        mu1 += sC1;
+        multiply( mu1, sigma1_sq, mu1 );
+        sigma1_sq.release();
 
+        Mat & ssim_map = mu1_mu2;
+        ssim_map /= mu1;
+        mu1.release();
 
-      Mat & ssim_map = mu1_mu2;
-      ssim_map /= mu1;
-      mu1.release();
+        if (scale == 0) grid_artifacts(ssim_map, nChan, score, score_max, 0);
 
-      if (scale == 0) grid_artifacts(ssim_map, nChan, score, score_max, 0);
-
-      // optional: write a nice debug image that shows the problematic areas
+        // optional: write a nice debug image that shows the problematic areas
 #ifdef DEBUG_IMAGES
-      Mat ssim_image;
-      ssim_map.convertTo(ssim_image,CV_8UC3,255);
+        Mat ssim_image;
+        ssim_map.convertTo(ssim_image,CV_8UC3,255);
         for( int i=0 ; i < ssim_image.rows * ssim_image.cols; i++ ) {
             Vec3b &p = ssim_image.at<Vec3b>(i);
             p = {(uchar)(255-p[2]),(uchar)(255-p[0]),(uchar)(255-p[1])};
         }
-      imwrite("debug-scale"+to_string(scale)+".png",ssim_image);
+        imwrite("debug-scale"+to_string(scale)+".png",ssim_image);
 #endif
 
-      // average ssim over the entire image
-      Scalar avg = mean( ssim_map );
-      for(unsigned int i = 0; i < nChan; i++) {
-        score += (i>0?chroma_weight:1.0) * avg[i] * scale_weights[i][scale];
-        score_max += (i>0?chroma_weight:1.0) * scale_weights[i][scale];
-      }
+        // average ssim over the entire image
+        Scalar avg = mean( ssim_map );
+        for(unsigned int i = 0; i < nChan; i++) {
+            score += (i>0?chroma_weight:1.0) * avg[i] * scale_weights[i][scale];
+            score_max += (i>0?chroma_weight:1.0) * scale_weights[i][scale];
+        }
 
-      // worst ssim in a particular 4x4 block (larger blocks are considered too because of multi-scale)
-      resize(ssim_map, ssim_map, Size(), 0.25, 0.25, INTER_AREA);
+        // worst ssim in a particular 4x4 block (larger blocks are considered too because of multi-scale)
+        resize(ssim_map, ssim_map, Size(), 0.25, 0.25, INTER_AREA);
 
-      Mat ssim_map_c[4];
-      split(ssim_map, ssim_map_c);
-      for (unsigned int i=0; i < nChan; i++) {
-        double minVal;
-        minMaxLoc(ssim_map_c[i], &minVal);
-        score += min_weight[i]  * minVal * mscale_weights[i][scale];
-        score_max += min_weight[i]  * mscale_weights[i][scale];
-      }
-
+        Mat ssim_map_c[4];
+        split(ssim_map, ssim_map_c);
+        for (unsigned int i=0; i < nChan; i++) {
+            double minVal;
+            minMaxLoc(ssim_map_c[i], &minVal);
+            score += min_weight[i]  * minVal * mscale_weights[i][scale];
+            score_max += min_weight[i]  * mscale_weights[i][scale];
+        }
     }
 
 
